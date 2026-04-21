@@ -1,0 +1,60 @@
+server:
+  port: 8080
+  error:
+    include-message: always
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 3MB
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/dev_platform?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false
+    username: root      # 改成你的MySQL账号
+    password: root123456    # 改成你的MySQL密码
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+
+logging:
+  pattern:
+    level: "%5p [traceId:%X{traceId:-}]"
+
+app:
+  security:
+    jwt:
+      secret: ${APP_JWT_SECRET:change-this-jwt-secret}
+      expiration-ms: ${APP_JWT_EXPIRATION_MS:604800000}
+  github:
+    client-id: ${GITHUB_CLIENT_ID:}
+    client-secret: ${GITHUB_CLIENT_SECRET:}
+    token: ${GITHUB_TOKEN:}
+    proxy-host: ${GITHUB_PROXY_HOST:127.0.0.1}
+    proxy-port: ${GITHUB_PROXY_PORT:6478}
+    proxy-enabled: ${GITHUB_PROXY_ENABLED:true}
+  ai:
+    api:
+      enabled: ${AI_ENABLED:false}
+      # 硅基流动 OpenAI-兼容：建议使用 /v1 作为基路径
+      base-url: ${AI_BASE_URL:https://api.siliconflow.cn/v1}
+      api-key: ${AI_API_KEY:}
+      model: ${AI_MODEL:Qwen/Qwen2.5-32B-Instruct}
+      proxy-enabled: ${AI_PROXY_ENABLED:false}
+      proxy-host: ${AI_PROXY_HOST:127.0.0.1}
+      proxy-port: ${AI_PROXY_PORT:6478}
+    profile:
+      ttl-days: ${AI_PROFILE_TTL_DAYS:7}
+      repo-sample-limit: ${AI_PROFILE_REPO_SAMPLE_LIMIT:10}
+      max-file-bytes: ${AI_PROFILE_MAX_FILE_BYTES:81920}
+  # 信用评分算法版本开关：
+  # 当前系统只保留 V2：基于 13 篇文献的客观化重构（T/CESA 标准 + AHP + 多属性合规 + Sigmoid + 分位数阈值）
+  # 已删除 V1 旧代理指标公式与版本开关。

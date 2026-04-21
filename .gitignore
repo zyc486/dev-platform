@@ -1,0 +1,64 @@
+# Maven
+target/
+.mvn/
+mvnw
+mvnw.cmd
+*.jar
+*.war
+*.ear
+
+# Node
+node_modules/
+front-spa/node_modules/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.project
+.classpath
+.settings/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Uploads and generated files
+uploads/
+*.tmp
+*.bak
+*.backup
+
+# Build outputs
+dist/
+build/
+*.class
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite
+*.dbf
+
+# Temporary files
+*.tmp
+*.temp
+*.cache

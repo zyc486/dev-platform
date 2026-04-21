@@ -1,0 +1,2 @@
+-- 手动异步刷新信用（需求 3）：复用现有表 credit_score、credit_history，无需新增 DDL。
+-- 刷新成功后会向 credit_history 追加与当前各 scene 行一致的快照（record_date = 当天）。
