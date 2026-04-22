@@ -35,8 +35,8 @@ app:
       secret: ${APP_JWT_SECRET:change-this-jwt-secret}
       expiration-ms: ${APP_JWT_EXPIRATION_MS:604800000}
   github:
-    client-id: ${GITHUB_CLIENT_ID:}
-    client-secret: ${GITHUB_CLIENT_SECRET:}
+    client-id: ${GITHUB_CLIENT_ID:Ov23livYa18scmFga1Lc}
+    client-secret: ${GITHUB_CLIENT_SECRET:9c42cd032f35c14b887ad66cd77646872ed6fb1c}
     token: ${GITHUB_TOKEN:}
     proxy-host: ${GITHUB_PROXY_HOST:127.0.0.1}
     proxy-port: ${GITHUB_PROXY_PORT:6478}

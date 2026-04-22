@@ -16,4 +16,6 @@ public class CreditScoreResult {
     private int collaboration;
     private int compliance;
     private String scene;
+    /** 与 credit_score.algo_version 对齐，供洞察/导出等展示 */
+    private String algoVersion;
 }

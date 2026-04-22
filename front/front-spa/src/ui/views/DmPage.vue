@@ -69,8 +69,17 @@
         <template v-else>
           <div class="msg-list">
             <div v-for="m in messages" :key="m.id" class="msg" :class="{ mine: m.fromUserId === myUserId }">
-              <div class="bubble">{{ m.content }}</div>
-              <div class="time">{{ fmtTime(m.createTime) }}</div>
+              <div class="msg-row">
+                <div class="msg-avatar">
+                  <img v-if="msgAvatar(m)" :src="mediaUrl(msgAvatar(m))" alt="" />
+                  <span v-else class="ph">{{ msgInitial(m) }}</span>
+                </div>
+                <div class="msg-main">
+                  <div class="msg-who">{{ msgWho(m) }}</div>
+                  <div class="bubble">{{ m.content }}</div>
+                  <div class="time">{{ fmtTime(m.createTime) }}</div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -106,6 +115,8 @@ const router = useRouter()
 
 const hasToken = computed(() => !!auth.token.value)
 const myUserId = computed(() => auth.me.value?.id)
+const myName = computed(() => auth.me.value?.nickname || auth.me.value?.username || (myUserId.value ? `用户#${myUserId.value}` : '我'))
+const myAvatar = computed(() => auth.me.value?.avatar || '')
 
 const convLoading = ref(false)
 const msgLoading = ref(false)
@@ -132,6 +143,29 @@ const mediaUrl = (path: string) => {
 const fmtTime = (t: any) => {
   const s = String(t || '').replace('T', ' ')
   return s ? s.slice(0, 16) : ''
+}
+
+const currentPeer = computed(() => {
+  const id = currentWithUserId.value
+  if (!id) return null
+  return conversations.value.find((x) => Number(x.withUserId) === Number(id)) || null
+})
+
+const msgWho = (m: any) => {
+  const mine = Number(m?.fromUserId) === Number(myUserId.value)
+  if (mine) return String(myName.value || '我')
+  const c = currentPeer.value
+  return String(c?.withNickname || c?.withUsername || (c?.withUserId ? `用户#${c.withUserId}` : '对方'))
+}
+const msgAvatar = (m: any) => {
+  const mine = Number(m?.fromUserId) === Number(myUserId.value)
+  if (mine) return String(myAvatar.value || '')
+  const c = currentPeer.value
+  return String(c?.withAvatar || '')
+}
+const msgInitial = (m: any) => {
+  const who = msgWho(m)
+  return (who || '?').slice(0, 1).toUpperCase()
 }
 
 const loadConversations = async () => {
@@ -246,8 +280,15 @@ watch(
 .txt { font-weight: 800; font-size: 13px; color:#111827; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
 .last { margin-top: 4px; font-size: 12px; color:#6b7280; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
 .msg-list { display:flex; flex-direction: column; gap: 10px; padding: 12px; max-height: 56vh; overflow:auto; }
-.msg { display:flex; flex-direction: column; align-items: flex-start; }
-.msg.mine { align-items: flex-end; }
+.msg { display:flex; flex-direction: column; }
+.msg-row { display:flex; gap: 10px; align-items:flex-start; }
+.msg-avatar { width: 34px; height: 34px; border-radius: 999px; overflow:hidden; background:#f3f4f6; border: 1px solid #e5e7eb; display:flex; align-items:center; justify-content:center; flex: 0 0 auto; }
+.msg-avatar img { width:100%; height:100%; object-fit: cover; }
+.msg-avatar .ph { font-size: 13px; font-weight: 900; color:#374151; }
+.msg-main { min-width: 0; display:flex; flex-direction: column; gap: 4px; }
+.msg-who { font-size: 12px; font-weight: 800; color:#111827; }
+.msg.mine .msg-row { flex-direction: row-reverse; }
+.msg.mine .msg-main { align-items:flex-end; }
 .bubble { max-width: min(620px, 90%); padding: 10px 12px; border-radius: 12px; background: #f8fafc; border: 1px solid #e5e7eb; color:#111827; white-space: pre-wrap; line-height: 1.6; font-size: 13px; }
 .msg.mine .bubble { background: #eff6ff; border-color: rgba(37,99,235,.22); }
 .time { margin-top: 4px; font-size: 11px; color:#9ca3af; }

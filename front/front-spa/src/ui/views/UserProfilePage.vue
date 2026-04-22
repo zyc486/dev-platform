@@ -144,6 +144,10 @@ const toggleFollow = async () => {
     await unwrap(api.post(`/follow/operate`, null, { params: { followUserId: uid } }))
     isFollowing.value = !isFollowing.value
     ElMessage.success('已更新关注状态')
+    // 重新拉一次关系状态，避免 UI 与后端不一致
+    try { await loadRelationship() } catch {}
+    // 通知其他页面（如个人中心）同步关注列表/动态
+    try { window.dispatchEvent(new CustomEvent('follow-changed')) } catch {}
   } catch (e: any) {
     ElMessage.error(e?.message || '操作失败')
   } finally {

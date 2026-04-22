@@ -110,6 +110,31 @@ public class UserController {
         }
     }
 
+    /**
+     * GitHub OAuth 回调兜底：前端正常流程是 GitHub 回调到 SPA 路由 {@code /auth/callback}，
+     * 由 {@code AuthCallbackPage} 组件拿 {@code code} 再请求 {@code /oauth/login} 或 {@code /oauth/bind}。
+     *
+     * <p>若 GitHub OAuth App 后台误配置成 {@code .../api/user/oauth/callback}，本接口会把 GitHub 返回的
+     * {@code code}/{@code state} 无损 302 转到前端路由，保证 OAuth 流程不会因回调地址不一致而中断。</p>
+     */
+    @GetMapping("/oauth/callback")
+    public void oauthCallback(@RequestParam(required = false) String code,
+                              @RequestParam(required = false) String state,
+                              javax.servlet.http.HttpServletResponse response) throws java.io.IOException {
+        StringBuilder target = new StringBuilder("/auth/callback");
+        boolean first = true;
+        if (code != null && !code.isEmpty()) {
+            target.append(first ? '?' : '&').append("code=")
+                    .append(java.net.URLEncoder.encode(code, java.nio.charset.StandardCharsets.UTF_8.name()));
+            first = false;
+        }
+        if (state != null && !state.isEmpty()) {
+            target.append(first ? '?' : '&').append("state=")
+                    .append(java.net.URLEncoder.encode(state, java.nio.charset.StandardCharsets.UTF_8.name()));
+        }
+        response.sendRedirect(target.toString());
+    }
+
     @PostMapping("/oauth/login")
     public Result<?> oauthLogin(@RequestParam String code, HttpServletRequest request) {
         try {

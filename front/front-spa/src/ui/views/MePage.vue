@@ -264,7 +264,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from 'vue'
+import { onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api, unwrap } from '../api'
@@ -379,17 +379,27 @@ const loadFollowingFeed = async () => {
 const loadMyFollows = async () => {
   try {
     myFollows.value = await unwrap<any[]>(api.get('/follow/my'))
-  } catch {
+  } catch (e: any) {
     myFollows.value = []
+    ElMessage.error(e?.message || '加载关注列表失败')
   }
 }
 
 const loadMyFans = async () => {
   try {
     myFans.value = await unwrap<any[]>(api.get('/follow/fans'))
-  } catch {
+  } catch (e: any) {
     myFans.value = []
+    ElMessage.error(e?.message || '加载粉丝列表失败')
   }
+}
+
+const onFollowChanged = async () => {
+  // 个人中心打开时，尽量同步关注/粉丝/关注动态
+  try {
+    await Promise.all([loadMyFollows(), loadMyFans()])
+    if (extraTab.value === 'feed') await loadFollowingFeed()
+  } catch {}
 }
 
 const loadBadges = async () => {
@@ -693,7 +703,14 @@ const goPublicSelf = () => {
   if (u) router.push(`/u/${encodeURIComponent(u)}`)
 }
 
-onMounted(reload)
+onMounted(async () => {
+  window.addEventListener('follow-changed', onFollowChanged as any)
+  await reload()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('follow-changed', onFollowChanged as any)
+})
 </script>
 
 <style scoped>

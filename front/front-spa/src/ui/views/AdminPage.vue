@@ -38,6 +38,7 @@
               <el-button v-if="activeMenu === 'logs'" size="small" @click="exportLogs('admin')">导出管理员日志</el-button>
               <el-button v-if="activeMenu === 'logs'" size="small" @click="exportLogs('query')">导出查询日志</el-button>
               <el-button v-if="activeMenu === 'loginLogs'" size="small" type="primary" @click="loadLoginLogs">刷新</el-button>
+              <el-button v-if="activeMenu === 'chatRooms'" size="small" type="primary" @click="loadChatRooms">查询</el-button>
               <el-button v-if="activeMenu !== 'dashboard'" size="small" @click="loadAll">刷新</el-button>
             </div>
           </div>
@@ -129,8 +130,66 @@
             <el-table-column prop="time" label="时间" width="160" />
           </el-table>
         </div>
+
+        <div v-else-if="activeMenu === 'chatRooms'">
+          <div class="filter">
+            <el-input v-model="chatRoomFilter.roomId" placeholder="roomId" clearable style="width:120px" />
+            <el-input v-model="chatRoomFilter.chatNo" placeholder="群聊号" clearable style="width:140px" />
+            <el-input v-model="chatRoomFilter.nameLike" placeholder="群名关键词" clearable style="width:160px" />
+            <el-input v-model="chatRoomFilter.userId" placeholder="成员用户ID" clearable style="width:140px" />
+            <el-select v-model="chatRoomFilter.userScope" placeholder="用户范围" clearable style="width:120px">
+              <el-option label="成员包含" value="member" />
+              <el-option label="仅群主" value="owner" />
+            </el-select>
+            <el-date-picker v-model="chatRoomFilter.createdFrom" type="date" value-format="YYYY-MM-DD" placeholder="开始" style="width:140px" />
+            <el-date-picker v-model="chatRoomFilter.createdTo" type="date" value-format="YYYY-MM-DD" placeholder="结束" style="width:140px" />
+            <el-input v-model="chatRoomFilter.memberCountMin" placeholder="人数≥" clearable style="width:110px" />
+            <el-input v-model="chatRoomFilter.memberCountMax" placeholder="人数≤" clearable style="width:110px" />
+            <el-button type="primary" @click="loadChatRooms">查询</el-button>
+            <el-button @click="resetChatRoomFilter">重置</el-button>
+          </div>
+
+          <el-table :data="chatRooms" stripe size="small">
+            <el-table-column prop="roomId" label="roomId" width="90" />
+            <el-table-column prop="chatNo" label="群聊号" width="120" />
+            <el-table-column prop="name" label="群名" min-width="150" show-overflow-tooltip />
+            <el-table-column prop="createdBy" label="群主ID" width="90" />
+            <el-table-column prop="createTime" label="创建时间" width="160" />
+            <el-table-column prop="memberCount" label="人数" width="70" />
+            <el-table-column label="操作" width="220">
+              <template #default="{ row }">
+                <el-button size="small" @click="openChatRoomDetail(row)">详情</el-button>
+                <el-button size="small" type="danger" plain @click="forceCloseChatRoom(row)">强制关闭</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div class="muted" style="margin-top:10px;">共 {{ chatRoomTotal }} 条</div>
+        </div>
       </el-card>
     </main>
+
+    <el-dialog v-model="chatRoomDetail.visible" title="群聊详情" width="860px">
+      <div class="muted" style="margin-bottom:10px;">
+        roomId={{ chatRoomDetail.room?.roomId }} · 群聊号={{ chatRoomDetail.room?.chatNo }} · 群名={{ chatRoomDetail.room?.name }}
+      </div>
+      <el-table :data="chatRoomDetail.members" stripe size="small">
+        <el-table-column prop="userId" label="用户ID" width="90" />
+        <el-table-column prop="username" label="用户名" width="140" />
+        <el-table-column prop="nickname" label="昵称" width="140" />
+        <el-table-column prop="role" label="角色" width="90" />
+        <el-table-column label="操作" width="240">
+          <template #default="{ row }">
+            <el-button size="small" type="warning" plain :disabled="row.role === 'owner'" @click="kickMember(chatRoomDetail.room?.roomId, row)">踢人</el-button>
+            <el-button size="small" type="primary" plain :disabled="row.role === 'owner'" @click="toggleAdmin(chatRoomDetail.room?.roomId, row)">
+              {{ row.role === 'admin' ? '撤管理员' : '设管理员' }}
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="chatRoomDetail.visible=false">关闭</el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog v-model="reply.visible" title="回复反馈" width="520px">
       <div class="muted" style="margin-bottom:8px;">{{ reply.current?.title }}</div>
@@ -157,6 +216,7 @@ const menus = [
   { key: 'users', label: '用户管理' },
   { key: 'reports', label: '举报处理' },
   { key: 'feedbacks', label: '反馈管理' },
+  { key: 'chatRooms', label: '群聊管理' },
   { key: 'logs', label: '系统日志' },
   { key: 'loginLogs', label: '登录审计' },
 ] as const
@@ -166,6 +226,7 @@ const titleMap: Record<string, string> = {
   users: '用户管理',
   reports: '举报处理',
   feedbacks: '反馈管理',
+  chatRooms: '群聊管理',
   logs: '系统日志',
   loginLogs: '登录审计',
 }
@@ -189,6 +250,23 @@ const loginFilter = reactive<{ username: string; from: string; to: string; succe
   success: null,
 })
 
+const chatRooms = ref<any[]>([])
+const chatRoomTotal = ref(0)
+const chatRoomFilter = reactive<any>({
+  userId: '',
+  userScope: 'member',
+  createdFrom: '',
+  createdTo: '',
+  memberCountMin: '',
+  memberCountMax: '',
+  chatNo: '',
+  roomId: '',
+  nameLike: '',
+  page: 1,
+  size: 50,
+})
+const chatRoomDetail = reactive<{ visible: boolean; room: any; members: any[] }>({ visible: false, room: null, members: [] })
+
 const reply = reactive<{ visible: boolean; current: any; content: string }>({
   visible: false,
   current: null,
@@ -196,6 +274,7 @@ const reply = reactive<{ visible: boolean; current: any; content: string }>({
 })
 
 const loadAll = async () => {
+  if (activeMenu.value === 'chatRooms') return void loadChatRooms()
   try {
     const [d, u, r, f, a, q] = await Promise.all([
       api.get('/api/admin/dashboard'),
@@ -214,6 +293,89 @@ const loadAll = async () => {
     if (Number(body(q)?.code) === 200) queryLogs.value = body(q).data || []
   } catch (e: any) {
     ElMessage.error(e?.message || '加载失败')
+  }
+}
+
+const resetChatRoomFilter = () => {
+  chatRoomFilter.userId = ''
+  chatRoomFilter.userScope = 'member'
+  chatRoomFilter.createdFrom = ''
+  chatRoomFilter.createdTo = ''
+  chatRoomFilter.memberCountMin = ''
+  chatRoomFilter.memberCountMax = ''
+  chatRoomFilter.chatNo = ''
+  chatRoomFilter.roomId = ''
+  chatRoomFilter.nameLike = ''
+  chatRoomFilter.page = 1
+  chatRoomFilter.size = 50
+}
+
+const loadChatRooms = async () => {
+  try {
+    const params: any = { page: chatRoomFilter.page, size: chatRoomFilter.size }
+    if (chatRoomFilter.userId) params.userId = Number(chatRoomFilter.userId)
+    if (chatRoomFilter.userScope) params.userScope = chatRoomFilter.userScope
+    if (chatRoomFilter.createdFrom) params.createdFrom = chatRoomFilter.createdFrom
+    if (chatRoomFilter.createdTo) params.createdTo = chatRoomFilter.createdTo
+    if (chatRoomFilter.memberCountMin) params.memberCountMin = Number(chatRoomFilter.memberCountMin)
+    if (chatRoomFilter.memberCountMax) params.memberCountMax = Number(chatRoomFilter.memberCountMax)
+    if (chatRoomFilter.chatNo) params.chatNo = String(chatRoomFilter.chatNo).trim()
+    if (chatRoomFilter.roomId) params.roomId = Number(chatRoomFilter.roomId)
+    if (chatRoomFilter.nameLike) params.nameLike = String(chatRoomFilter.nameLike).trim()
+    const data = await unwrap<{ list: any[]; total: number }>(api.get('/api/admin/chat/rooms', { params }))
+    chatRooms.value = data?.list || []
+    chatRoomTotal.value = Number(data?.total || 0)
+  } catch (e: any) {
+    chatRooms.value = []
+    chatRoomTotal.value = 0
+    ElMessage.error(e?.message || '加载失败')
+  }
+}
+
+const openChatRoomDetail = async (row: any) => {
+  try {
+    const data = await unwrap<any>(api.get(`/api/admin/chat/room/${row.roomId}`))
+    chatRoomDetail.room = data || null
+    chatRoomDetail.members = data?.members || []
+    chatRoomDetail.visible = true
+  } catch (e: any) {
+    ElMessage.error(e?.message || '加载失败')
+  }
+}
+
+const forceCloseChatRoom = async (row: any) => {
+  try { await ElMessageBox.confirm(`确认强制关闭群聊「${row.name}」？此操作不可恢复。`, '强制关闭', { type: 'warning' }) } catch { return }
+  try {
+    await unwrap(api.post(`/api/admin/chat/room/${row.roomId}/close`))
+    ElMessage.success('已关闭')
+    await loadChatRooms()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '失败')
+  }
+}
+
+const kickMember = async (roomId: any, row: any) => {
+  if (!roomId) return
+  try { await ElMessageBox.confirm(`确认将用户「${row.username || row.userId}」踢出群聊？`, '踢人', { type: 'warning' }) } catch { return }
+  try {
+    await unwrap(api.post(`/api/admin/chat/room/${roomId}/members/${row.userId}/kick`))
+    ElMessage.success('已踢出')
+    await openChatRoomDetail({ roomId })
+    await loadChatRooms()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '失败')
+  }
+}
+
+const toggleAdmin = async (roomId: any, row: any) => {
+  if (!roomId) return
+  const next = row.role === 'admin' ? 'member' : 'admin'
+  try {
+    await unwrap(api.post(`/api/admin/chat/room/${roomId}/members/${row.userId}/role`, { role: next }))
+    ElMessage.success('已更新')
+    await openChatRoomDetail({ roomId })
+  } catch (e: any) {
+    ElMessage.error(e?.message || '失败')
   }
 }
 

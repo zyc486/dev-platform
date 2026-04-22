@@ -39,7 +39,7 @@ public class SecurityConfig {
                 .and()
                 .authorizeHttpRequests(auth -> auth
                     .antMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                    .antMatchers("/api/user/login", "/api/user/register", "/api/user/oauth/login", "/api/user/oauth/login/**", "/error", "/test/**").permitAll()
+                    .antMatchers("/api/user/login", "/api/user/register", "/api/user/oauth/login", "/api/user/oauth/login/**", "/api/user/oauth/callback", "/error", "/test/**").permitAll()
                     .anyRequest().permitAll()
                 );
 

@@ -88,8 +88,8 @@
           <div class="dim-bars">
             <div class="dim-row" v-for="d in dimList" :key="d.key">
               <div class="dim-label">{{ d.label }}</div>
-              <div class="dim-bar-track"><div class="dim-bar-fill" :style="{width: (insightData[d.key]||0)+'%', background: d.color}"></div></div>
-              <div class="dim-score-val">{{ insightData[d.key] ?? 0 }}</div>
+              <div class="dim-bar-track"><div class="dim-bar-fill" :style="{width: (insightDimScore(d.key))+'%', background: d.color}"></div></div>
+              <div class="dim-score-val">{{ insightDimScore(d.key) }}</div>
             </div>
           </div>
         </div>
@@ -104,7 +104,20 @@
         </template>
         <div v-if="aiProfileLoading" class="muted">加载中...</div>
         <template v-else>
-          <el-alert v-if="aiProfile && (aiProfile.status && aiProfile.status !== 'ready')" :title="String(aiProfile.status)" type="info" show-icon :closable="false" />
+          <div v-if="!aiProfile && insightData" class="muted" style="margin-bottom:8px;">
+            {{ aiProfileLoadError || '暂未加载画像，可点击「刷新画像」；若长期失败请确认后端已设置 AI_ENABLED 与 AI_API_KEY。' }}
+          </div>
+          <el-alert
+            v-if="aiProfile && aiProfile.status && aiProfile.status !== 'ready'"
+            :title="aiProfileStatusTitle(aiProfile.status)"
+            type="warning"
+            show-icon
+            :closable="false"
+          >
+            <template v-if="aiProfileHintLines(aiProfile).length">
+              <div v-for="(line, i) in aiProfileHintLines(aiProfile)" :key="i" class="muted" style="margin-top:4px;line-height:1.5;">{{ line }}</div>
+            </template>
+          </el-alert>
           <div v-if="aiProfile && (aiProfile.summary || (aiProfile.status==='ready'))" class="ai-summary">
             {{ aiProfile.summary || '—' }}
           </div>
@@ -117,6 +130,11 @@
             <div style="font-weight:700;margin-bottom:6px;">代表项目</div>
             <el-collapse>
               <el-collapse-item v-for="(p,idx) in aiTopProjects" :key="idx" :title="p.repo">
+                <div v-if="p.repoUrl" style="margin-bottom:6px;">
+                  <a :href="p.repoUrl" target="_blank" rel="noreferrer" style="color:#2563eb;font-weight:700;">
+                    {{ p.repoFullName || p.repoUrl }}
+                  </a>
+                </div>
                 <div class="muted" v-if="p.techStack && p.techStack.length">techStack：{{ p.techStack.join(' / ') }}</div>
                 <div class="muted" v-if="p.reasons && p.reasons.length" style="margin-top:6px;">原因：{{ p.reasons.join('；') }}</div>
                 <div class="muted" v-if="p.signals && p.signals.length" style="margin-top:6px;">信号：{{ p.signals.join('；') }}</div>
@@ -238,6 +256,35 @@ const addLoading = ref(false)
 const insightData = ref<any>(null)
 const aiProfile = ref<any>(null)
 const aiProfileLoading = ref(false)
+const aiProfileLoadError = ref('')
+
+/** 洞察接口将四维放在 dimensions 内，对比接口为顶层字段，这里兼容两种结构 */
+const insightDimScore = (key: string) => {
+  const ins = insightData.value as Record<string, any> | null
+  if (!ins) return 0
+  const nested = ins.dimensions?.[key]
+  if (typeof nested === 'number') return nested
+  const flat = ins[key]
+  if (typeof flat === 'number') return flat
+  return 0
+}
+
+const aiProfileStatusTitle = (s: string) => {
+  const m: Record<string, string> = {
+    failed: '画像生成失败',
+    unavailable: '画像暂不可用',
+    refreshing: '画像生成中',
+  }
+  return m[s] || s
+}
+
+const aiProfileHintLines = (p: any) => {
+  const lines: string[] = []
+  if (p?.errorMessage) lines.push(String(p.errorMessage))
+  if (p?.hint) lines.push(String(p.hint))
+  if (p?.warning) lines.push(String(p.warning))
+  return lines
+}
 
 const trendUsername = ref('')
 const queryHistory = ref<any[]>([])
@@ -431,10 +478,12 @@ const loadInsight = async (username: string) => {
 const loadAiProfile = async (username: string) => {
   if (!username) return
   aiProfileLoading.value = true
+  aiProfileLoadError.value = ''
   try {
     aiProfile.value = await unwrap(api.get('/api/credit/aiProfile', { params: { githubUsername: username, scene: resolveSceneValue(selectedScene.value) } }))
-  } catch {
+  } catch (e: any) {
     aiProfile.value = null
+    aiProfileLoadError.value = e?.message || '画像接口请求失败'
   } finally {
     aiProfileLoading.value = false
   }
@@ -443,9 +492,14 @@ const refreshAiProfile = async () => {
   const name = insightData.value?.githubUsername
   if (!name) return
   aiProfileLoading.value = true
+  aiProfileLoadError.value = ''
   try {
     aiProfile.value = await unwrap(api.post('/api/credit/aiProfile/refresh', { githubUsername: name, scene: resolveSceneValue(selectedScene.value) }))
-  } catch {} finally { aiProfileLoading.value = false }
+  } catch (e: any) {
+    aiProfileLoadError.value = e?.message || '刷新画像失败'
+  } finally {
+    aiProfileLoading.value = false
+  }
 }
 
 const loadTrend = async () => {

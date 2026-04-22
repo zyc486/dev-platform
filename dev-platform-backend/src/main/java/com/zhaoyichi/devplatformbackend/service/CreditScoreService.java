@@ -726,6 +726,7 @@ public class CreditScoreService {
         result.put("scene", normalizedScene);
         result.put("totalScore", score.getTotalScore());
         result.put("level", score.getLevel());
+        result.put("algoVersion", score.getAlgoVersion() == null || score.getAlgoVersion().isEmpty() ? ALGO_VERSION : score.getAlgoVersion());
 
         int stability = safeScore(score.getStability());
         int prQuality = safeScore(score.getPrQuality());
@@ -799,6 +800,8 @@ public class CreditScoreService {
 
     private CreditRankItemVO buildRankItem(CreditScore score, User user) {
         CreditRankItemVO item = new CreditRankItemVO();
+        item.setUserId(user == null ? null : user.getId());
+        item.setUsername(user == null ? null : user.getUsername());
         item.setGithubUsername(score.getGithubUsername());
         item.setNickname(user == null ? null : user.getNickname());
         item.setAvatar(user == null ? null : user.getAvatar());

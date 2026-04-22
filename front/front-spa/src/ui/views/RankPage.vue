@@ -50,7 +50,7 @@
         <el-table-column type="index" label="#" width="60" />
         <el-table-column label="开发者" min-width="200">
           <template #default="{ row }">
-            <div class="user">
+            <div class="user user-link" @click="goProfile(row)">
               <div class="avatar">
                 <img v-if="row.avatar" :src="mediaUrl(row.avatar)" alt="" @error="hideBrokenImage" />
                 <span v-else class="ph">{{ initialOf(row) }}</span>
@@ -79,6 +79,7 @@
         <el-table-column label="操作" width="150">
           <template #default="{ row }">
             <el-button size="small" type="primary" plain @click="goCredit(row)">查看画像</el-button>
+            <el-button size="small" @click="goProfile(row)">主页</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -200,6 +201,12 @@ const goCredit = (row: any) => {
   router.push({ path: '/credit', query: { user: gh } })
 }
 
+const goProfile = (row: any) => {
+  const u = String(row?.username || '').trim()
+  if (!u) return ElMessage.warning('该条目不是站内用户，暂无主页')
+  router.push(`/u/${encodeURIComponent(u)}`)
+}
+
 onMounted(load)
 </script>
 
@@ -213,6 +220,8 @@ onMounted(load)
 .tbl { margin-top: 12px; }
 .empty { padding: 14px 0; text-align: center; }
 .user { display:flex; gap: 10px; align-items:center; }
+.user-link { cursor: pointer; }
+.user-link:hover .name { text-decoration: underline; }
 .avatar { width: 36px; height: 36px; border-radius: 999px; overflow:hidden; border: 1px solid #e5e7eb; background:#fff; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .avatar img { width: 100%; height: 100%; object-fit: cover; }
 .ph { font-weight: 900; color:#111827; }

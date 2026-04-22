@@ -31,7 +31,13 @@ import java.util.Objects;
 public class GithubRepoSampler {
 
     private static final int DEFAULT_REPO_SAMPLE_LIMIT = 10;
-    private static final int DEFAULT_MAX_FILE_BYTES = 80 * 1024; // 80KB
+    private static final int DEFAULT_MAX_FILE_BYTES = 16 * 1024; // 16KB（单文件上限）
+    /**
+     * AI 画像输入总预算（只针对 files 文本内容 + rootEntries 列表）
+     *
+     * <p>避免触发大模型 max_seq_len 限制（例如 32768 tokens）。</p>
+     */
+    private static final int DEFAULT_MAX_TOTAL_TEXT_BYTES = 64 * 1024; // 64KB
 
     @Autowired
     private GithubProperties githubProperties;
@@ -63,11 +69,13 @@ public class GithubRepoSampler {
 
         SampledGithubProfile out = new SampledGithubProfile();
         out.githubUsername = gh;
-        out.user = user;
+        out.user = slimUser(user);
 
         String reposUrl = "https://api.github.com/users/" + gh + "/repos?per_page=" + Math.max(1, repoSampleLimit) + "&sort=pushed";
         List<Map<String, Object>> repos = fetchList(rt, entity, reposUrl);
         out.repos = new ArrayList<>();
+
+        int remainingTextBudget = DEFAULT_MAX_TOTAL_TEXT_BYTES;
 
         for (Map<String, Object> repo : repos) {
             if (repo == null) continue;
@@ -77,7 +85,7 @@ public class GithubRepoSampler {
 
             SampledRepo r = new SampledRepo();
             r.name = repoName;
-            r.repoMeta = repo;
+            r.repoMeta = slimRepoMeta(repo);
 
             // releases：只取最新一条
             String relUrl = "https://api.github.com/repos/" + gh + "/" + repoName + "/releases?per_page=1";
@@ -90,17 +98,26 @@ public class GithubRepoSampler {
             // root tree（1 层）：用 contents API 列目录
             String rootContentsUrl = "https://api.github.com/repos/" + gh + "/" + repoName + "/contents";
             List<Map<String, Object>> root = fetchList(rt, entity, rootContentsUrl);
-            r.rootEntries = limitList(root, 120);
+            r.rootEntries = slimRootEntries(limitList(root, 40));
+            remainingTextBudget -= roughBytes(r.rootEntries);
 
             // 关键文件抽样
             r.files = new LinkedHashMap<>();
             for (String p : keyFileCandidates(root)) {
-                String content = fetchTextFileViaContents(rt, entity, gh, repoName, p, maxFileBytes);
+                if (remainingTextBudget <= 0) break;
+                int perFileCap = Math.max(1024, Math.min(maxFileBytes, remainingTextBudget));
+                String content = fetchTextFileViaContents(rt, entity, gh, repoName, p, perFileCap);
                 if (content != null) {
                     r.files.put(p, content);
+                    remainingTextBudget -= roughBytes(content);
                 }
             }
             out.repos.add(r);
+
+            // 总预算耗尽则提前结束（避免提示词过长导致 400）
+            if (remainingTextBudget <= 0) {
+                break;
+            }
         }
 
         return out;
@@ -263,6 +280,87 @@ public class GithubRepoSampler {
         if (list == null || list.isEmpty()) return Collections.emptyList();
         if (list.size() <= cap) return list;
         return list.subList(0, cap);
+    }
+
+    // ============================ slimming / budgets ============================
+
+    private static Map<String, Object> slimUser(Map<String, Object> u) {
+        if (u == null) return null;
+        Map<String, Object> m = new LinkedHashMap<>();
+        copyIfPresent(u, m, "login");
+        copyIfPresent(u, m, "name");
+        copyIfPresent(u, m, "company");
+        copyIfPresent(u, m, "blog");
+        copyIfPresent(u, m, "location");
+        copyIfPresent(u, m, "email");
+        copyIfPresent(u, m, "bio");
+        copyIfPresent(u, m, "public_repos");
+        copyIfPresent(u, m, "followers");
+        copyIfPresent(u, m, "following");
+        copyIfPresent(u, m, "created_at");
+        copyIfPresent(u, m, "updated_at");
+        copyIfPresent(u, m, "avatar_url");
+        return m;
+    }
+
+    private static Map<String, Object> slimRepoMeta(Map<String, Object> repo) {
+        if (repo == null) return null;
+        Map<String, Object> m = new LinkedHashMap<>();
+        copyIfPresent(repo, m, "name");
+        copyIfPresent(repo, m, "full_name");
+        copyIfPresent(repo, m, "html_url");
+        copyIfPresent(repo, m, "description");
+        copyIfPresent(repo, m, "homepage");
+        copyIfPresent(repo, m, "language");
+        copyIfPresent(repo, m, "fork");
+        copyIfPresent(repo, m, "archived");
+        copyIfPresent(repo, m, "disabled");
+        copyIfPresent(repo, m, "stargazers_count");
+        copyIfPresent(repo, m, "forks_count");
+        copyIfPresent(repo, m, "open_issues_count");
+        copyIfPresent(repo, m, "size");
+        copyIfPresent(repo, m, "default_branch");
+        copyIfPresent(repo, m, "topics");
+        copyIfPresent(repo, m, "license");
+        copyIfPresent(repo, m, "created_at");
+        copyIfPresent(repo, m, "updated_at");
+        copyIfPresent(repo, m, "pushed_at");
+        return m;
+    }
+
+    private static List<Map<String, Object>> slimRootEntries(List<Map<String, Object>> root) {
+        if (root == null || root.isEmpty()) return Collections.emptyList();
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> e : root) {
+            if (e == null) continue;
+            Map<String, Object> m = new LinkedHashMap<>();
+            copyIfPresent(e, m, "name");
+            copyIfPresent(e, m, "path");
+            copyIfPresent(e, m, "type");
+            copyIfPresent(e, m, "size");
+            out.add(m);
+        }
+        return out;
+    }
+
+    private static void copyIfPresent(Map<String, Object> from, Map<String, Object> to, String key) {
+        if (from == null || to == null || key == null) return;
+        if (from.containsKey(key)) {
+            to.put(key, from.get(key));
+        }
+    }
+
+    private static int roughBytes(Object o) {
+        if (o == null) return 0;
+        if (o instanceof String) {
+            return ((String) o).length() * 2;
+        }
+        // 粗估：转字符串长度 *2；预算只用于防爆，不追求精确
+        try {
+            return String.valueOf(o).length() * 2;
+        } catch (Exception ignore) {
+            return 0;
+        }
     }
 }
 

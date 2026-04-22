@@ -8,6 +8,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CreditRankItemVO {
+    private Long userId;
+    private String username;
     private String githubUsername;
     private String nickname;
     private String avatar;

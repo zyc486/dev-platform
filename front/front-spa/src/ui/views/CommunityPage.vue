@@ -202,7 +202,15 @@
           </div>
           <div class="post-meta">
             {{ p.type === 'announcement' ? '公告' : '帖子' }} · {{ categoryLabel(p.category) }} ·
-            {{ p.authorUsername || ('用户' + p.userId) }} · {{ formatTime(p.createTime) }}
+            <span
+              class="link"
+              role="button"
+              tabindex="0"
+              @click="openUserProfile(p.authorUsername)"
+              @keydown.enter.prevent="openUserProfile(p.authorUsername)"
+              @keydown.space.prevent="openUserProfile(p.authorUsername)"
+            >{{ p.authorUsername || ('用户' + p.userId) }}</span>
+            · {{ formatTime(p.createTime) }}
           </div>
           <div class="post-body">{{ p.content }}</div>
           <div class="post-actions">
@@ -375,9 +383,12 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api, unwrap } from '../api'
 import { auth } from '../auth'
+
+const router = useRouter()
 
 const hasToken = computed(() => !!auth.token.value)
 
@@ -637,6 +648,12 @@ const selectCommunity = async (c: any) => {
   await refreshMember()
   await loadPendingApplies()
   await loadPosts()
+}
+
+const openUserProfile = (username: any) => {
+  const u = String(username || '').trim()
+  if (!u) return
+  router.push(`/u/${encodeURIComponent(u)}`)
 }
 const toggleSticky = async (p: any) => {
   const v = !(p.isSticky === 1)
@@ -930,5 +947,7 @@ onMounted(async () => {
 }
 .list-title { font-weight: 800; color: #111827; }
 .list-sub { font-size: 12px; color: #6b7280; margin-top: 4px; }
+.link { color:#2563eb; font-weight: 700; cursor: pointer; }
+.link:hover { text-decoration: underline; }
 </style>
 

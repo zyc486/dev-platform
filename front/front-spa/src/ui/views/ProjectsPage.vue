@@ -5,7 +5,6 @@
         <div class="row">
           <div>
             <div class="title">协作与项目</div>
-            <div class="muted">协作大厅（旧版 collab.html 全链路）+ 项目管理（看板/Issue）</div>
           </div>
           <div class="actions">
             <el-button size="small" @click="refreshCurrent">刷新</el-button>

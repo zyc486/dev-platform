@@ -77,7 +77,10 @@ public class AiProfileService {
                     "请确认环境变量已生效（新开终端后启动后端），并设置 AI_ENABLED=true、AI_API_KEY=...。");
         }
 
-        boolean expired = snap == null || snap.getExpiresAt() == null || snap.getExpiresAt().isBefore(LocalDateTime.now());
+        boolean promptStale = snap != null
+                && !AiProfilePromptBuilder.PROMPT_VERSION.equals(snap.getPromptVersion());
+        boolean expired = snap == null || snap.getExpiresAt() == null || snap.getExpiresAt().isBefore(LocalDateTime.now())
+                || promptStale;
         if (!expired) {
             return toResponse(snap, false);
         }

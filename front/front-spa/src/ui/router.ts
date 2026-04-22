@@ -21,6 +21,7 @@ const HelpPage = () => import('./views/HelpPage.vue')
 const AdminPage = () => import('./views/AdminPage.vue')
 const UserProfilePage = () => import('./views/UserProfilePage.vue')
 const DmPage = () => import('./views/DmPage.vue')
+const ChatPage = () => import('./views/ChatPage.vue')
 
 const router = createRouter({
   history: createWebHistory(),
@@ -48,6 +49,7 @@ const router = createRouter({
     { path: '/issues/:issueId', component: IssueDetailPage },
     { path: '/notifications', component: NotificationsPage },
     { path: '/dm', component: DmPage },
+    { path: '/chat', component: ChatPage },
     { path: '/publish', component: PublishPage },
     { path: '/admin', component: AdminPage },
   ],

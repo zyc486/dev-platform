@@ -26,7 +26,15 @@
 
         <el-dropdown trigger="click" @command="onUserMenu">
           <span class="avatar-trigger">
-            <span class="avatar">{{ initial }}</span>
+            <img
+              v-if="avatarUrl && !avatarLoadFailed"
+              class="avatar avatar-img"
+              :src="avatarUrl"
+              alt="avatar"
+              referrerpolicy="no-referrer"
+              @error="avatarLoadFailed = true"
+            />
+            <span v-else class="avatar">{{ initial }}</span>
             <span class="avatar-name">{{ me?.username || '未登录' }}</span>
           </span>
           <template #dropdown>
@@ -36,11 +44,13 @@
               <el-dropdown-item command="credit">信用/画像</el-dropdown-item>
               <el-dropdown-item command="community">社区</el-dropdown-item>
               <el-dropdown-item command="rank">排行榜</el-dropdown-item>
+              <el-dropdown-item v-if="me?.username" command="chat">群聊</el-dropdown-item>
               <el-dropdown-item v-if="me?.username" command="me">个人中心</el-dropdown-item>
               <el-dropdown-item v-if="me?.username" command="publish">发布项目</el-dropdown-item>
               <el-dropdown-item divided command="notifications">
                 通知 <span v-if="unreadCount" style="margin-left:6px;color:#dc2626;">({{ unreadCount }})</span>
               </el-dropdown-item>
+              <el-dropdown-item v-if="me?.username" command="dm">私信</el-dropdown-item>
               <el-dropdown-item command="help">帮助中心</el-dropdown-item>
               <el-dropdown-item command="feedback">意见反馈</el-dropdown-item>
               <el-dropdown-item v-if="me?.role === 'admin'" divided command="admin">管理后台</el-dropdown-item>
@@ -63,6 +73,8 @@
           <div class="nav-title">协作</div>
           <div class="nav-item" :class="{ active: isActive('/projects') }" @click="navTo('/projects')">项目</div>
           <div class="nav-item" :class="{ active: isActive('/publish') }" @click="navTo('/publish')">发布项目</div>
+          <div class="nav-item" :class="{ active: isActive('/chat') }" @click="navTo('/chat')">群聊</div>
+          <div class="nav-item" :class="{ active: isActive('/dm') }" @click="navTo('/dm')">私信</div>
         </div>
         <div class="nav-group">
           <div class="nav-title">画像与社区</div>
@@ -92,10 +104,16 @@
           <div class="search-title">开发者</div>
           <div v-if="(searchResult.developers||[]).length===0" class="muted">无</div>
           <div v-else>
-            <div class="search-item" v-for="d in (searchResult.developers||[]).slice(0,6)" :key="'d-'+d.id" @click="goCreditUser(d.githubUsername||d.username)">
+            <a
+              class="search-item search-link"
+              v-for="d in (searchResult.developers||[]).slice(0,6)"
+              :key="'d-'+d.id"
+              :href="userProfileHref(d.username)"
+              @click.prevent="goUserProfile(d.username)"
+            >
               <div class="si-title">{{ d.nickname || d.username }}</div>
               <div class="si-sub">{{ d.githubUsername || '—' }} · {{ d.score ?? 0 }} · {{ d.level || '—' }}</div>
-            </div>
+            </a>
           </div>
         </div>
         <div class="search-col">
@@ -146,6 +164,22 @@ const unreadCount = computed(() => notificationsStore.unreadCount.value)
 
 const initial = computed(() => String(me.value?.username || 'U').slice(0, 1).toUpperCase())
 
+const avatarLoadFailed = ref(false)
+const avatarUrl = computed(() => {
+  const raw = String(me.value?.avatar || '').trim()
+  if (!raw) return ''
+  if (/^https?:\/\//i.test(raw)) return raw
+  // 约定后端返回相对路径：/uploads/avatar/...
+  return raw.startsWith('/') ? raw : `/${raw}`
+})
+
+watch(
+  () => me.value?.avatar,
+  () => {
+    avatarLoadFailed.value = false
+  },
+)
+
 const isActive = (prefix: string) => String(route.path || '').startsWith(prefix)
 const navTo = (path: string) => {
   drawer.value = false
@@ -158,6 +192,17 @@ const goCommunity = () => router.push('/community')
 const goCreditUser = (gh: string) => {
   searchVisible.value = false
   router.push({ path: '/credit', query: { user: gh } })
+}
+const goUserProfile = (username: string) => {
+  const u = String(username || '').trim()
+  if (!u) return
+  searchVisible.value = false
+  router.push(`/u/${encodeURIComponent(u)}`)
+}
+
+const userProfileHref = (username: any) => {
+  const u = String(username || '').trim()
+  return u ? `/u/${encodeURIComponent(u)}` : '#'
 }
 
 const openSearch = async () => {
@@ -201,6 +246,8 @@ const onUserMenu = (cmd: string) => {
   if (cmd === 'projects') return router.push('/projects')
   if (cmd === 'credit') return router.push('/credit')
   if (cmd === 'community') return router.push('/community')
+  if (cmd === 'chat') return router.push('/chat')
+  if (cmd === 'dm') return router.push('/dm')
   if (cmd === 'me') return router.push('/me')
   if (cmd === 'notifications') return router.push('/notifications')
   if (cmd === 'rank') return router.push('/rank')
@@ -270,6 +317,7 @@ watch(
 .topbar-right { display:flex; align-items:center; gap: 10px; min-width: 240px; justify-content: flex-end; }
 .avatar-trigger { display:flex; align-items:center; gap: 8px; cursor: pointer; }
 .avatar { width: 28px; height: 28px; border-radius: 999px; background: #111827; color:#fff; display:flex; align-items:center; justify-content:center; font-weight: 900; font-size: 13px; }
+.avatar-img { object-fit: cover; display: block; border: 1px solid #e5e7eb; background: #fff; }
 .avatar-name { color:#111827; font-weight: 700; font-size: 13px; }
 .content { padding: 16px; max-width: 1280px; margin: 0 auto; }
 .nav { display:flex; flex-direction: column; gap: 14px; }
@@ -284,6 +332,7 @@ watch(
 .search-title { font-weight: 900; margin-bottom: 8px; }
 .search-item { padding: 10px 12px; border:1px solid #e5e7eb; border-radius: 12px; cursor:pointer; background:#fff; }
 .search-item:hover { background:#fafafa; }
+.search-link { display:block; text-decoration: none; color: inherit; }
 .si-title { font-weight: 800; color:#111827; }
 .si-sub { margin-top: 4px; color:#6b7280; font-size: 12px; }
 </style>

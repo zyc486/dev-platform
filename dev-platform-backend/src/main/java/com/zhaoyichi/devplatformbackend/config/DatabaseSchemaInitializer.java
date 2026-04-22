@@ -82,6 +82,69 @@ public class DatabaseSchemaInitializer {
                     "KEY idx_dm_to_read (to_user_id, is_read, create_time)" +
                     ")");
 
+            // 群聊：房间/成员/消息（最小可用）
+            jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS chat_room (" +
+                    "id bigint NOT NULL AUTO_INCREMENT," +
+                    "chat_no varchar(20) NULL," +
+                    "name varchar(100) NOT NULL," +
+                    "created_by bigint NOT NULL," +
+                    "collab_project_id int NULL," +
+                    "create_time datetime DEFAULT CURRENT_TIMESTAMP," +
+                    "PRIMARY KEY (id)," +
+                    "UNIQUE KEY uk_chat_room_chat_no (chat_no)," +
+                    "KEY idx_chat_room_collab (collab_project_id)," +
+                    "KEY idx_chat_room_creator (created_by)" +
+                    ")");
+            jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS chat_room_member (" +
+                    "id bigint NOT NULL AUTO_INCREMENT," +
+                    "room_id bigint NOT NULL," +
+                    "user_id bigint NOT NULL," +
+                    "role varchar(20) DEFAULT 'member'," +
+                    "last_read_message_id bigint NULL," +
+                    "join_time datetime DEFAULT CURRENT_TIMESTAMP," +
+                    "PRIMARY KEY (id)," +
+                    "UNIQUE KEY uk_chat_room_member (room_id, user_id)," +
+                    "KEY idx_chat_room_member_user (user_id, room_id)" +
+                    ")");
+            jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS chat_message (" +
+                    "id bigint NOT NULL AUTO_INCREMENT," +
+                    "room_id bigint NOT NULL," +
+                    "from_user_id bigint NOT NULL," +
+                    "content varchar(2000) NOT NULL," +
+                    "create_time datetime DEFAULT CURRENT_TIMESTAMP," +
+                    "PRIMARY KEY (id)," +
+                    "KEY idx_chat_room_msg (room_id, id)" +
+                    ")");
+
+            // 群聊：入群申请/邀请
+            jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS chat_join_request (" +
+                    "id bigint NOT NULL AUTO_INCREMENT," +
+                    "room_id bigint NOT NULL," +
+                    "applicant_user_id bigint NOT NULL," +
+                    "status varchar(20) DEFAULT 'pending'," +
+                    "reason varchar(500) NULL," +
+                    "handled_by bigint NULL," +
+                    "handle_reason varchar(500) NULL," +
+                    "create_time datetime DEFAULT CURRENT_TIMESTAMP," +
+                    "handle_time datetime NULL," +
+                    "PRIMARY KEY (id)," +
+                    "KEY idx_chat_join_room_status_time (room_id, status, create_time)," +
+                    "KEY idx_chat_join_applicant_status_time (applicant_user_id, status, create_time)" +
+                    ")");
+
+            jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS chat_invite (" +
+                    "id bigint NOT NULL AUTO_INCREMENT," +
+                    "room_id bigint NOT NULL," +
+                    "inviter_user_id bigint NOT NULL," +
+                    "invitee_user_id bigint NOT NULL," +
+                    "status varchar(20) DEFAULT 'pending'," +
+                    "create_time datetime DEFAULT CURRENT_TIMESTAMP," +
+                    "handle_time datetime NULL," +
+                    "PRIMARY KEY (id)," +
+                    "KEY idx_chat_invite_room_status_time (room_id, status, create_time)," +
+                    "KEY idx_chat_invite_invitee_status_time (invitee_user_id, status, create_time)" +
+                    ")");
+
             jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS admin_action_log (" +
                     "id bigint NOT NULL AUTO_INCREMENT," +
                     "admin_user_id bigint NOT NULL," +
@@ -146,6 +209,10 @@ public class DatabaseSchemaInitializer {
             ensureColumn(jdbcTemplate, "user", "avatar", "ALTER TABLE user ADD COLUMN avatar varchar(500) NULL COMMENT '头像URL'");
             ensureColumn(jdbcTemplate, "user", "nickname", "ALTER TABLE user ADD COLUMN nickname varchar(100) NULL COMMENT '昵称'");
             ensureColumn(jdbcTemplate, "user", "bio", "ALTER TABLE user ADD COLUMN bio varchar(500) NULL COMMENT '个人简介'");
+            ensureColumn(jdbcTemplate, "chat_room", "chat_no", "ALTER TABLE chat_room ADD COLUMN chat_no varchar(20) NULL COMMENT '群聊号（纯数字唯一）'");
+            ensureUniqueIndex(jdbcTemplate, "chat_room", "chat_no", "uk_chat_room_chat_no", "CREATE UNIQUE INDEX uk_chat_room_chat_no ON chat_room(chat_no)");
+            // backfill for old rooms
+            jdbcTemplate.execute("UPDATE chat_room SET chat_no = CAST(100000 + id AS CHAR) WHERE chat_no IS NULL OR chat_no = ''");
             ensureColumn(jdbcTemplate, "query_log", "is_favorite", "ALTER TABLE query_log ADD COLUMN is_favorite tinyint(1) DEFAULT 0 COMMENT '是否收藏'");
             ensureColumn(jdbcTemplate, "user_post", "status", "ALTER TABLE user_post ADD COLUMN status varchar(20) DEFAULT 'approved' COMMENT '帖子状态: pending/approved/rejected'");
             ensureColumn(jdbcTemplate, "feedback", "reply_time", "ALTER TABLE feedback ADD COLUMN reply_time datetime NULL");

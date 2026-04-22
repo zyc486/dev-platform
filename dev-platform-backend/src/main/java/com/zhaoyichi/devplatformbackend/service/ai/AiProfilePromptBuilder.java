@@ -16,7 +16,7 @@ import java.util.Map;
 public class AiProfilePromptBuilder {
 
     public static final String PROFILE_VERSION = "v1";
-    public static final String PROMPT_VERSION = "v1";
+    public static final String PROMPT_VERSION = "v2";
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -32,7 +32,8 @@ public class AiProfilePromptBuilder {
         List<Map<String, Object>> msgs = new ArrayList<>();
         msgs.add(sys("你是一个用于“开发者协作平台”的分析助手。你的任务是基于输入的 GitHub 公开元数据与抽样文件，生成可解释的开发者画像。"
                 + "必须遵守：1) 只基于输入，不要编造不存在的事实；2) 结论必须给出 evidence（repo+字段/文件）；3) 不能输出大量原文代码，最多摘要；"
-                + "4) 不确定就写 uncertain=true；5) 只输出一个 JSON 对象，不要输出多余文字。"));
+                + "4) 不确定就写 uncertain=true；5) 只输出一个 JSON 对象，不要输出多余文字；"
+                + "6) 所有自然语言内容必须使用简体中文（包括 summary、reasons、signals、judgement、notes、risk、detail 等）。"));
 
         msgs.add(user("请根据以下输入生成画像。输出 JSON schema 必须包含以下字段："
                 + "{"
@@ -40,7 +41,7 @@ public class AiProfilePromptBuilder {
                 + "\"promptVersion\":string,"
                 + "\"githubUsername\":string,"
                 + "\"techTags\":[{\"tag\":string,\"confidence\":number}],"
-                + "\"topProjects\":[{\"repo\":string,\"reasons\":[string],\"techStack\":[string],\"signals\":[string]}],"
+                + "\"topProjects\":[{\"repo\":string,\"repoFullName\":string,\"repoUrl\":string,\"reasons\":[string],\"techStack\":[string],\"signals\":[string]}],"
                 + "\"deliverySignals\":[{\"signal\":string,\"level\":\"high\"|\"medium\"|\"low\",\"evidence\":[string]}],"
                 + "\"codeQualityHeuristics\":[{\"item\":string,\"judgement\":string,\"uncertain\":boolean,\"evidence\":[string]}],"
                 + "\"collaborationStyle\":{\"type\":string,\"notes\":string,\"evidence\":[string]},"
@@ -48,6 +49,7 @@ public class AiProfilePromptBuilder {
                 + "\"summary\":string,"
                 + "\"evidence\":[{\"key\":string,\"detail\":string}]"
                 + "}"
+                + "其中 topProjects 的 repoUrl 必须是可直接访问的 GitHub URL（例如 https://github.com/<owner>/<repo>）。"
                 + "其中 evidence 字段中的 key 建议格式：\"repo:<name>#file:<path>\" 或 \"user:<field>\" 或 \"repo:<name>#meta:<field>\"。"
                 + "输入如下（JSON）：\n" + inputJson));
         return msgs;

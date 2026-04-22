@@ -25,31 +25,31 @@
       <template #header>
         <div class="row">
           <div style="font-weight: 800">筛选</div>
-          <el-tag size="small" type="info">未读 {{ unreadCount }}</el-tag>
+          <el-tag v-if="unreadCount > 0" size="small" type="info">未读 {{ unreadCount }}</el-tag>
         </div>
       </template>
 
       <div class="tabs">
         <div class="tab" :class="{ active: filterType === 'all' }" @click="filterType = 'all'">
-          全部 <span class="badge">{{ unreadCount }}</span>
+          全部 <span v-if="unreadCount > 0" class="badge">{{ unreadCount }}</span>
         </div>
         <div class="tab" :class="{ active: filterType === 'system' }" @click="filterType = 'system'">
-          系统 <span class="badge">{{ systemUnreadCount }}</span>
+          系统 <span v-if="systemUnreadCount > 0" class="badge">{{ systemUnreadCount }}</span>
         </div>
         <div class="tab" :class="{ active: filterType === 'collab' }" @click="filterType = 'collab'">
-          协作 <span class="badge">{{ collabUnreadCount }}</span>
+          协作 <span v-if="collabUnreadCount > 0" class="badge">{{ collabUnreadCount }}</span>
         </div>
         <div class="tab" :class="{ active: filterType === 'follow' }" @click="filterType = 'follow'">
-          关注 <span class="badge">{{ followUnreadCount }}</span>
+          关注 <span v-if="followUnreadCount > 0" class="badge">{{ followUnreadCount }}</span>
         </div>
         <div class="tab" :class="{ active: filterType === 'mention' }" @click="filterType = 'mention'">
-          @提及 <span class="badge">{{ mentionUnreadCount }}</span>
+          @提及 <span v-if="mentionUnreadCount > 0" class="badge">{{ mentionUnreadCount }}</span>
         </div>
         <div class="tab" :class="{ active: filterType === 'security' }" @click="filterType = 'security'">
-          安全 <span class="badge">{{ securityUnreadCount }}</span>
+          安全 <span v-if="securityUnreadCount > 0" class="badge">{{ securityUnreadCount }}</span>
         </div>
         <div class="tab" :class="{ active: filterType === 'unread' }" @click="filterType = 'unread'">
-          未读 <span class="badge">{{ unreadCount }}</span>
+          未读 <span v-if="unreadCount > 0" class="badge">{{ unreadCount }}</span>
         </div>
       </div>
     </el-card>
@@ -110,6 +110,13 @@ const typeTextMap: Record<string, string> = {
   comment: '评论通知',
   mention: '@ 提及',
   security: '安全提醒',
+  chat_apply: '群聊申请',
+  chat_apply_result: '群聊申请结果',
+  chat_invite: '群聊邀请',
+  chat_invite_result: '群聊邀请结果',
+  chat_member_left: '群聊成员变动',
+  chat_room_closed: '群聊关闭',
+  chat_kicked: '群聊移出',
 }
 
 const unreadCount = computed(() => msgList.value.filter((i) => !i.read).length)
@@ -118,6 +125,15 @@ const collabUnreadCount = computed(() => msgList.value.filter((i) => i.type === 
 const followUnreadCount = computed(() => msgList.value.filter((i) => i.type === 'follow' && !i.read).length)
 const mentionUnreadCount = computed(() => msgList.value.filter((i) => i.type === 'mention' && !i.read).length)
 const securityUnreadCount = computed(() => msgList.value.filter((i) => i.type === 'security' && !i.read).length)
+
+// 顶部导航红色角标来自全局 notificationsStore；本页的未读数变化时需同步回去（否则“清空/已读”后角标会残留）。
+watch(
+  () => unreadCount.value,
+  (n) => {
+    notificationsStore.setUnread(n)
+  },
+  { immediate: true },
+)
 
 const filteredMsgList = computed(() => {
   if (filterType.value === 'all') return msgList.value
@@ -151,6 +167,7 @@ const markAllRead = async () => {
   try {
     await unwrap(api.post('/api/message/readAll'))
     msgList.value.forEach((i) => (i.read = true))
+    notificationsStore.setUnread(0)
     ElMessage.success('所有消息已标记为已读')
   } catch (e: any) {
     ElMessage.error(e?.message || '操作失败')
@@ -187,6 +204,7 @@ const clearAll = async () => {
   try {
     await unwrap(api.delete('/api/message/clear'))
     msgList.value = []
+    notificationsStore.setUnread(0)
     ElMessage.success('所有消息已清空')
   } catch (e: any) {
     ElMessage.error(e?.message || '清空失败')
@@ -216,6 +234,15 @@ const markReadAndNavigate = async (m: any) => {
       router.push({ path: '/dm', query: { withUserId: String(withUserId) } })
     } else {
       router.push('/dm')
+    }
+    return
+  }
+  if (String(m.type || '').startsWith('chat_')) {
+    const roomId = m.relatedId
+    if (roomId) {
+      router.push({ path: '/chat', query: { roomId: String(roomId), manage: '1' } })
+    } else {
+      router.push('/chat')
     }
     return
   }

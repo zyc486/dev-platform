@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [vue()],
   build: {
     // 单入口部署：直接把 SPA 构建产物输出到后端 static 目录，由 8080 同端口托管。
-    outDir: path.resolve(__dirname, '../dev-platform-backend/src/main/resources/static'),
+    outDir: path.resolve(__dirname, '../../dev-platform-backend/src/main/resources/static'),
     emptyOutDir: true,
   },
   server: {

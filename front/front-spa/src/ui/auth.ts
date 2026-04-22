@@ -5,6 +5,8 @@ type Me = {
   username?: string
   githubUsername?: string
   role?: string
+  avatar?: string
+  nickname?: string
 }
 
 const token = ref<string>(localStorage.getItem('token') || '')

@@ -37,6 +37,10 @@ desktop.ini
 .env
 .env.local
 .env.*.local
+.venv/
+
+# Local dev secrets / scripts (do not commit)
+scripts/dev-secrets.ps1
 
 # Uploads and generated files
 uploads/

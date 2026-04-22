@@ -80,14 +80,14 @@
         <div v-if="loadingHotDev" class="muted">加载中...</div>
         <div v-else-if="hotDevelopers.length === 0" class="muted">暂无数据</div>
         <div v-else class="rank">
-          <div class="rank-item" v-for="(u, i) in hotDevelopers.slice(0, 10)" :key="u.id || i" @click="goCreditUser(u.githubUsername || u.username)">
+          <a class="rank-item rank-link" v-for="(u, i) in hotDevelopers.slice(0, 10)" :key="u.id || i" :href="userProfileHref(u.username)" @click.prevent="goUserProfile(u.username)">
             <div class="rank-no">{{ i + 1 }}</div>
             <div class="rank-main">
               <div class="rank-name">{{ u.nickname || u.username }}</div>
               <div class="rank-sub">{{ u.githubUsername || '—' }} · {{ u.level || '—' }}</div>
             </div>
             <div class="rank-score">{{ u.score ?? 0 }}</div>
-          </div>
+          </a>
         </div>
       </el-card>
 
@@ -206,6 +206,15 @@ const goProjects = () => router.push('/projects')
 const goProject = (id: number) => router.push(`/projects/${id}`)
 const goCredit = () => router.push('/credit')
 const goCreditUser = (gh: string) => router.push({ path: '/credit', query: { user: gh } })
+const goUserProfile = (username: string) => {
+  const u = String(username || '').trim()
+  if (!u) return ElMessage.warning('未获取到该用户的站内用户名')
+  router.push(`/u/${encodeURIComponent(u)}`)
+}
+const userProfileHref = (username: any) => {
+  const u = String(username || '').trim()
+  return u ? `/u/${encodeURIComponent(u)}` : '#'
+}
 const goCommunity = () => router.push('/community')
 
 onMounted(async () => {
@@ -264,6 +273,7 @@ onMounted(async () => {
 }
 .rank-item:hover { background: #fafafa; }
 .rank-item:last-child { border-bottom: none; }
+.rank-link { text-decoration: none; color: inherit; }
 .rank-no { width: 22px; text-align: center; color:#6b7280; font-weight: 800; }
 .rank-main { flex:1; min-width:0; }
 .rank-name { font-weight: 800; color:#111827; }
